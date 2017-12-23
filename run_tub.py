@@ -32,12 +32,20 @@ ENABLE = 0b00000100 # Enable bit
 E_PULSE = 0.0005
 E_DELAY = 0.0005
 
+# Run Statuses
+STARTING_UP = 10
+RUNNING = 20
+ERROR = 99
+
+run_status = STARTING_UP
+
 #Open I2C interface
 #bus = smbus.SMBus(0)  # Rev 1 Pi uses 0
 bus = smbus.SMBus(1) # Rev 2 Pi uses 1
 
 # Temperature settingsTUB_SENSOR = ''
-HEATER_SENSOR = '28-011592aeacff'
+#HEATER_SENSOR = '28-011592aeacff'
+HEATER_SENSOR = '28-011592ac2bff'
 TUB_SENSOR = '28-011592ac2bff'
 OUTSIDE_SENSOR = '28-011592ac2bff'
 
@@ -58,14 +66,10 @@ jets1 = LED(26)	# Relay 1
 jets2 = LED(19) # Relay 2
 air = LED(13) # Relay 3
 heater = LED(6) # Relay 4
-pin5 = LED(5) # Relay 5
+lights = LED(5) # Relay 5
 pin6 = LED(11) # Relay 6
 pin7 = LED(9) # Relay 7
-pin8 = LED(10) # Relay 8
-
-jets1_running = False
-jets2_running = False
-air_running = False  
+circ_pump = LED(10) # Relay 8
 
 def lcd_init():
   # Initialise display
@@ -149,7 +153,6 @@ def read_temp():
 # Button handlers
 def temp_down_pressed():
 	print 'Pressed'
-	temp_led.on()
 
 def temp_down_released():
 	global desired_temp
@@ -164,31 +167,22 @@ def temp_up_released():
 		desired_temp += 0.5
 
 def switch_jets1():
-	global jets1_running
-	if jets1_running == True:
+	if jets1.is_lit == True:
 		jets1.off()
-		jets1_running = False
 	else:
 		jets1.on()
-		jets1_running = True
 
 def switch_jets2():
-	global jets2_running
-	if jets2_running == True:
+	if jets2.islit == True:
 		jets2.off()
-		jets2_running = False
 	else:
 		jets2.on()
-		jets2_running = True
 
 def switch_air():
-	global air_running
-	if air_running == True:
+	if air.is_lit == True:
 		air.off()
-		air_running = False
 	else:
 		air.on()
-		air_running = True
 
 def shutdown():
   check_call(['sudo', 'poweroff'])
@@ -269,7 +263,23 @@ def test_board():
 		sleep(1)	
 		pin8.off()
 		sleep(1)	
+
+def pumps_off():
+	print "Pumps off"
+	jets1.off()
+	jets2.off()
+	air.off
+		
+def all_stop():
+	print "ALL STOP"
+	heater.off()
+	pumps_off()
+	circ_pupm.off()
+	lights.off()
 	
+def display_text(message_text):
+	lcd_string(message_text,LCD_LINE_4)
+
 	
 def main():
 	
@@ -306,10 +316,20 @@ def main():
 	lcd_init()
 
 	# Startup routine
-	
-	# Run the Circulating pump for 5 seconds
-	
-	# If not flowing then 
+	display_status("Starting up ...")
+		
+	# Run the Circulating pump briefly
+	circ_pump.on()
+	sleep(2)
+
+	# If not flowing then STOP
+	if flow_button.is_pressed() == False:
+		circ_pump.off()
+		display_status("Error: No flow")
+		run_status = ERROR
+	else:
+		run_status = RUNNING
+					
 	while True:
 		read_temp()
 		data = json.load(open(data_filename))
@@ -318,39 +338,38 @@ def main():
 		heater_temp = data['heater_temp']
 		print heater_temp
 		
-		if status == STARTING_UP:
-			
-		else:
-		if heater_temp < desired_temp:
-			heater.on()
+		if run_status == RUNNING:	
+			if heater_temp < desired_temp:
+				heater.on()
 		
-		if heater_temp >= desired_temp:
-			heater.off()
+			if heater_temp >= desired_temp:
+				heater.off()
 
-		line1_text = 'Target:' + str(desired_temp) + ' At:' + str(tub_temp)
-		line2_text = 'Heater:' + str(heater_temp) + ' Outside:' + str(outside_temp)
-		line3_text = '30'
-		line4_text = ''
-		if (jets1_running):
-			line4_text += 'Jets1 '
-		else:
-			line4_text += '      '
+			line1_text = 'Target:' + str(desired_temp) + ' At:' + str(tub_temp)
+			line2_text = 'Heater:' + str(heater_temp) + ' Outside:' + str(outside_temp)
+			line3_text = '30'
+			line4_text = ''
+	
+			if (jets1_running):
+				line4_text += 'Jets1 '
+			else:
+				line4_text += '      '
 			
-		if (jets2_running):
-			line4_text += 'Jets2 '
-		else:
-			line4_text += '      '
+			if (jets2_running):
+				line4_text += 'Jets2 '
+			else:
+				line4_text += '      '
 			
-		if (air_running):
-			line4_text += 'Air'
-		else:
-			line4_text += '   '
+			if (air_running):
+				line4_text += 'Air'
+			else:
+				line4_text += '   '
 			
-		lcd_string(line1_text,LCD_LINE_1)
-		lcd_string(line2_text,LCD_LINE_2)
-		lcd_string(line3_text,LCD_LINE_3)	
-		lcd_string(line4_text,LCD_LINE_4)
-		sleep(1)
+			lcd_string(line1_text,LCD_LINE_1)
+			lcd_string(line2_text,LCD_LINE_2)
+			lcd_string(line3_text,LCD_LINE_3)	
+			lcd_string(line4_text,LCD_LINE_4)
+			sleep(1)
 
 if __name__ == '__main__':
 
