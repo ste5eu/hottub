@@ -11,8 +11,8 @@ from subprocess import check_call
 data_filename = '/data/temp_data.json'
 
 # Define some device parameters
-I2C_ADDR  = 0x3F # I2C device address
-LCD_WIDTH = 20   # Maximum characters per line
+I2C_ADDR  = 0xA0 # I2C device address
+LCD_WIDTH = 16   # Maximum characters per line
 
 # Define some device constants
 LCD_CHR = 1 # Mode - Sending data
@@ -42,10 +42,10 @@ TUB_SENSOR = '28-011592ac2bff'
 OUTSIDE_SENSOR = '28-011592ac2bff'
 
 # Define the GPIO Pins
-#PIN_TEMP = 26
-#PIN_JETS1 = 21
-#PIN_JETS2 = 20
-#PIN_AIR = 6
+PIN_TEMP = 26
+PIN_JETS1 = 19
+PIN_JETS2 = 13
+PIN_AIR = 6
 
 
 MAX_TEMP = 38
@@ -53,15 +53,14 @@ desired_temp = 21.0
 heater_temp = 0.0
 tub_temp = 0.0
 outside_temp = 0.0
-
-jets1 = LED(26)	# Relay 1
-jets2 = LED(19) # Relay 2
-air = LED(13) # Relay 3
-heater = LED(6) # Relay 4
-pin5 = LED(5) # Relay 5
-pin6 = LED(11) # Relay 6
-pin7 = LED(9) # Relay 7
-pin8 = LED(10) # Relay 8
+heater = LED(26)
+jets1 = LED(19)
+jets2 = LED(13)
+air = LED(6)
+pin5 = LED(5)
+pin6 = LED(11)
+pin7 = LED(9)
+pin8 = LED(10)
 
 jets1_running = False
 jets2_running = False
@@ -153,6 +152,8 @@ def temp_down_pressed():
 
 def temp_down_released():
 	global desired_temp
+	print'Released'
+	temp_led.off()
 	if desired_temp > 0:
 		desired_temp -= 0.5
 		
@@ -193,13 +194,6 @@ def switch_air():
 def shutdown():
   check_call(['sudo', 'poweroff'])
 
-def switch_lights():
-	print "Lights"
-	
-def flow_stopped():
-	#STOP EVERYTHING
-	
-	
 def test_board():
 	print("Test")
 	
@@ -273,54 +267,39 @@ def test_board():
 	
 def main():
 	
-	#test_board()
+	test_board()
   # Main program block
 	# Initialise the relays 
+	heater = LED(17)
 	temp = 19
 	
 	# Initialise the buttons
-	flow_button = Button(8)
-	flow_button.when_released = flow_stopped
-	
-	shutdown_button = Button(18, hold_time=2)
+	shutdown_button = Button(25, hold_time=2)
 	shutdown_button.when_held = shutdown
 
-	temp_down_button = Button(12)
+	temp_down_button = Button(21)
 	temp_down_button.when_released = temp_down_released
-	temp_up_button = Button(16)
+	temp_up_button = Button(20)
 	temp_up_button.when_released = temp_up_released
-	
-	jets1_button = Button(21)
+	jets1_button = Button(7)
 	jets1_button.when_released = switch_jets1
-	
-	jets2_button = Button(20)
+	jets2_button = Button(12)
 	jets2_button.when_released = switch_jets2
-	
-	air_button = Button(23)
+	air_button = Button(16)
 	air_button.when_released = switch_air
 	
-	lights_button = Button(24)
-	lights_button.when_released = switch_lights
 	
   # Initialise display
-	lcd_init()
+#	lcd_init()
 
-	# Startup routine
-	
-	# Run the Circulating pump for 5 seconds
-	
-	# If not flowing then 
 	while True:
-		read_temp()
+#		read_temp()
+		
 		data = json.load(open(data_filename))
 		print(data)
 	
 		heater_temp = data['heater_temp']
 		print heater_temp
-		
-		if status == STARTING_UP:
-			
-		else:
 		if heater_temp < desired_temp:
 			heater.on()
 		
@@ -346,10 +325,10 @@ def main():
 		else:
 			line4_text += '   '
 			
-		lcd_string(line1_text,LCD_LINE_1)
-		lcd_string(line2_text,LCD_LINE_2)
-		lcd_string(line3_text,LCD_LINE_3)	
-		lcd_string(line4_text,LCD_LINE_4)
+#		lcd_string(line1_text,LCD_LINE_1)
+#		lcd_string(line2_text,LCD_LINE_2)
+#		lcd_string(line3_text,LCD_LINE_3)	
+#		lcd_string(line4_text,LCD_LINE_4)
 		sleep(1)
 
 if __name__ == '__main__':
