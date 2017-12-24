@@ -44,7 +44,8 @@ run_status = STARTING_UP
 bus = smbus.SMBus(1) # Rev 2 Pi uses 1
 
 # Temperature settingsTUB_SENSOR = ''
-HEATER_SENSOR = '28-011592aeacff'
+#HEATER_SENSOR = '28-011592aeacff'
+HEATER_SENSOR = '28-011592ac2bff'
 TUB_SENSOR = '28-011592ac2bff'
 OUTSIDE_SENSOR = '28-011592ac2bff'
 
@@ -69,6 +70,7 @@ lights = LED(5) # Relay 5
 ozone = LED(11) # Relay 6
 pin7 = LED(9) # Relay 7
 circ_pump = LED(10) # Relay 8
+
 
 def lcd_init():
   # Initialise display
@@ -190,7 +192,7 @@ def switch_lights():
 	print "Lights"
 	
 def flow_stopped():
-	all_stop()
+	print "Flow stopped"
 	#STOP EVERYTHING
 	
 	
@@ -282,94 +284,16 @@ def display_text(message_text):
 
 	
 def main():
-	
-	#test_board()
-  # Main program block
-	# Initialise the relays 
-	temp = 19
-	
-	# Initialise the buttons
 	flow_button = Button(8)
-	flow_button.when_released = flow_stopped
-	
-	shutdown_button = Button(18, hold_time=2)
-	shutdown_button.when_held = shutdown
+	#flow_button.when_released = flow_stopped
 
-	temp_down_button = Button(12)
-	temp_down_button.when_released = temp_down_released
-	temp_up_button = Button(16)
-	temp_up_button.when_released = temp_up_released
-	
-	jets1_button = Button(21)
-	jets1_button.when_released = switch_jets1
-	
-	jets2_button = Button(20)
-	jets2_button.when_released = switch_jets2
-	
-	air_button = Button(23)
-	air_button.when_released = switch_air
-	
-	lights_button = Button(24)
-	lights_button.when_released = switch_lights
-	
-  # Initialise display
-	lcd_init()
-
-	# Startup routine
-	display_status("Starting up ...")
-		
-	# Run the Circulating pump and give it 10 seconds to spin up
+	# Run the Circulating pump briefly
 	circ_pump.on()
-	sleep(10)
-
-	# If not flowing then STOP
-	if flow_button.is_pressed == False:
-		circ_pump.off()
-		display_status("Error: No flow")
-		run_status = ERROR
-	else:
-		run_status = RUNNING
-					
 	while True:
-		read_temp()
-		data = json.load(open(data_filename))
-		print(data)
-	
-		heater_temp = data['heater_temp']
-		print heater_temp
-		
-		if run_status == RUNNING:	
-			if heater_temp < desired_temp:
-				heater.on()
-		
-			if heater_temp >= desired_temp:
-				heater.off()
-
-			line1_text = 'Target:' + str(desired_temp) + ' At:' + str(tub_temp)
-			line2_text = 'Heater:' + str(heater_temp) + ' Outside:' + str(outside_temp)
-			line3_text = '30'
-			line4_text = ''
-	
-			if (jets1_running):
-				line4_text += 'Jets1 '
-			else:
-				line4_text += '      '
-			
-			if (jets2_running):
-				line4_text += 'Jets2 '
-			else:
-				line4_text += '      '
-			
-			if (air_running):
-				line4_text += 'Air'
-			else:
-				line4_text += '   '
-			
-			lcd_string(line1_text,LCD_LINE_1)
-			lcd_string(line2_text,LCD_LINE_2)
-			lcd_string(line3_text,LCD_LINE_3)	
-			lcd_string(line4_text,LCD_LINE_4)
-			sleep(1)
+		print "Circulating"
+		if flow_button.is_pressed:
+			print "Flowing"
+		sleep(1)
 
 if __name__ == '__main__':
 
