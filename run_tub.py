@@ -2,13 +2,16 @@
 
 from gpiozero import LED, Button
 from time import sleep
+import datetime
 import json
 from pprint import pprint
 from signal import pause
 import smbus
 from subprocess import check_call
+import datetime
 
 data_filename = '/data/temp_data.json'
+status_filename = '/data/status_data.json'
 
 # Define some device parameters
 I2C_ADDR  = 0x3F # I2C device address
@@ -38,6 +41,10 @@ RUNNING = 20
 ERROR = 99
 
 run_status = STARTING_UP
+jet_stop_time = datetime.datetime.now()
+jet_stop_time = 0
+
+dateString = '%Y-%m-%d %H:%M:%S'
 
 #Open I2C interface
 #bus = smbus.SMBus(0)  # Rev 1 Pi uses 0
@@ -55,8 +62,8 @@ OUTSIDE_SENSOR = '28-011592ac2bff'
 #PIN_AIR = 6
 
 
-MAX_TEMP = 38
-desired_temp = 21.0
+MAX_TEMP = 70
+desired_temp = 37.0
 heater_temp = 0.0
 tub_temp = 0.0
 outside_temp = 0.0
@@ -69,6 +76,9 @@ lights = LED(5) # Relay 5
 ozone = LED(11) # Relay 6
 pin7 = LED(9) # Relay 7
 circ_pump = LED(10) # Relay 8
+
+flow_button = Button(8)
+
 
 def lcd_init():
   # Initialise display
@@ -140,6 +150,7 @@ def read_temp():
 	outside_temp = read_sensor(OUTSIDE_SENSOR)
 	
 	data = {}
+	data['read_time'] = datetime.datetime.now().strftime(dateString)
 	data['heater_temp'] = heater_temp
 	data['tub_temp'] = tub_temp
 	data['outside_temp'] = outside_temp
@@ -149,6 +160,13 @@ def read_temp():
 	df.write(json_data)
 	df.close()
 	
+def write_data(data, filename):
+	json_data = json.dumps(data)
+	
+	df = open(filename, 'w')
+	df.write(json_data)
+	df.close()
+
 # Button handlers
 def temp_down_pressed():
 	print 'Pressed'
@@ -166,16 +184,22 @@ def temp_up_released():
 		desired_temp += 0.5
 
 def switch_jets1():
+	global jet_start_time
+	
 	if jets1.is_lit == True:
 		jets1.off()
 	else:
 		jets1.on()
+		jet_stop_time = datetime.datetime.now() + datetime.timedelta(seconds=300)
 
 def switch_jets2():
-	if jets2.islit == True:
+	global jet_stop_time
+	
+	if jets2.is_lit == True:
 		jets2.off()
 	else:
 		jets2.on()
+		jet_stop_time = datetime.datetime.now() + datetime.timedelta(seconds=300)
 
 def switch_air():
 	if air.is_lit == True:
@@ -187,7 +211,10 @@ def shutdown():
   check_call(['sudo', 'poweroff'])
 
 def switch_lights():
-	print "Lights"
+	if lights.is_lit == True:
+		lights.off()
+	else:
+		lights.on()
 	
 def flow_stopped():
 	all_stop()
@@ -274,22 +301,69 @@ def all_stop():
 	print "ALL STOP"
 	heater.off()
 	pumps_off()
-	circ_pupm.off()
+	circ_pump.off()
 	lights.off()
 	
 def display_text(message_text):
 	lcd_string(message_text,LCD_LINE_4)
 
+def display_status():
+	data = {}
+	
+	data['read_time'] = datetime.datetime.now().strftime(dateString)
+	if jet_stop_time != 0:
+		data['jet_stop_time'] = jet_stop_time.strftime(dateString)
+	else:
+				data['jet_stop_time'] = 0
+
+	data['jets1'] = 0
+	if jets1.is_lit:
+		data['jets1'] = 1
+
+	data['jets2'] = 0	
+	if jets2.is_lit:
+		data['jets2'] = 1
+
+	data['air'] = 0
+	if air.is_lit:
+		data['air'] = 1
+
+	data['heater'] = 0
+	if heater.is_lit:
+		data['heater'] = 1
+
+	data['lights'] = 0
+	if lights.is_lit:
+		data['lights'] = 1
+
+	data['ozone'] = 0
+	if ozone.is_lit:
+		data['ozone'] = 1
+
+	data['pin7'] = 0
+	if pin7.is_lit:
+		data['pin7'] = 1
+
+	data['circ_pump'] = 0
+	if circ_pump.is_lit:
+		data['circ_pump'] = 1
+
+	data['flow'] = 0
+	if flow_button.is_pressed:
+		data['flow'] = 1
+
+	print data
+	write_data(data, status_filename)
 	
 def main():
-	
+	global jet_stop_time
+	print "Main"
 	#test_board()
   # Main program block
 	# Initialise the relays 
 	temp = 19
 	
 	# Initialise the buttons
-	flow_button = Button(8)
 	flow_button.when_released = flow_stopped
 	
 	shutdown_button = Button(18, hold_time=2)
@@ -311,64 +385,88 @@ def main():
 	
 	lights_button = Button(24)
 	lights_button.when_released = switch_lights
-	
+	print "Before LCD"
   # Initialise display
-	lcd_init()
-
+#	lcd_init()
+	print "After LCD init"
 	# Startup routine
-	display_status("Starting up ...")
-		
+#	display_text("Starting up ...")
+	print "circ_pump on"
 	# Run the Circulating pump and give it 10 seconds to spin up
 	circ_pump.on()
 	sleep(10)
 
-	# If not flowing then STOP
-	if flow_button.is_pressed == False:
-		circ_pump.off()
-		display_status("Error: No flow")
-		run_status = ERROR
-	else:
-		run_status = RUNNING
+	run_status = RUNNING
 					
-	while True:
+	while True:		
+		print "loop"
 		read_temp()
 		data = json.load(open(data_filename))
 		print(data)
 	
 		heater_temp = data['heater_temp']
-		print heater_temp
-		
-		if run_status == RUNNING:	
+		print "Heater Temp:"+str(heater_temp)
+		display_status()
+	
+		if heater_temp >= MAX_TEMP:
+			all_stop()
+			run_status = ERROR
+			print "Error: MAX TEMP"
+#			display_text("Error: MAX TEMP")
+			
+		if run_status == RUNNING:
+			print "RUNNING"
+			# If not flowing then STOP
+			if flow_button.is_pressed:
+				print "Flowing"
+			else:
+				print "Flow Error"
+				circ_pump.off()
+#				display_text("Error: No flow")
+				run_status = ERROR
+	
 			if heater_temp < desired_temp:
 				heater.on()
 		
 			if heater_temp >= desired_temp:
 				heater.off()
 
-			line1_text = 'Target:' + str(desired_temp) + ' At:' + str(tub_temp)
-			line2_text = 'Heater:' + str(heater_temp) + ' Outside:' + str(outside_temp)
+			if jet_stop_time != 0 and jet_stop_time <= datetime.datetime.now():
+				print "Timed out"
+				pumps_off()
+				jet_stop_time = 0
+				
+			line1_text = 'Target:' + str(desired_temp) + ' At:' + str(heater_temp)
+			line2_text = 'Tub:' + str(tub_temp) + ' Outside:' + str(outside_temp)
 			line3_text = '30'
 			line4_text = ''
 	
-			if (jets1_running):
+			if (jets1.is_lit):
 				line4_text += 'Jets1 '
 			else:
 				line4_text += '      '
 			
-			if (jets2_running):
+			if (jets2.is_lit):
 				line4_text += 'Jets2 '
 			else:
 				line4_text += '      '
 			
-			if (air_running):
+			if (air.is_lit):
 				line4_text += 'Air'
 			else:
 				line4_text += '   '
+#			try:
+#				lcd_string(line1_text,LCD_LINE_1)
+#				lcd_string(line2_text,LCD_LINE_2)
+#				lcd_string(line3_text,LCD_LINE_3)	
+#				lcd_string(line4_text,LCD_LINE_4)
+#			finally:
+#				print "Exception writing to LCD"
+#				print line1
+#				print line2
+#				print line3
+#				print line4
 			
-			lcd_string(line1_text,LCD_LINE_1)
-			lcd_string(line2_text,LCD_LINE_2)
-			lcd_string(line3_text,LCD_LINE_3)	
-			lcd_string(line4_text,LCD_LINE_4)
 			sleep(1)
 
 if __name__ == '__main__':
@@ -378,5 +476,6 @@ if __name__ == '__main__':
   except KeyboardInterrupt:
     pass
   finally:
-    lcd_byte(0x01, LCD_CMD)
+#    lcd_byte(0x01, LCD_CMD)
+		print "Exited"
 
